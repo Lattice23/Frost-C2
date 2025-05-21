@@ -1,0 +1,18 @@
+[project]
+name = "FrostC2"
+version = "1.0"
+description = "FrostC2 is a basic C2 framework with a python server and client, while the agent is written in C++"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "argparse>=1.4.0",
+    "colorama>=0.4.6",
+    "datetime>=5.5",
+    "flask>=3.1.1",
+    "flask-restful>=0.3.10",
+    "logging>=0.4.9.6",
+    "requests>=2.32.3",
+    "rich>=14.0.0",
+    "thread>=2.0.5",
+    "uuid>=1.30",
+]
