@@ -285,4 +285,4 @@ if __name__ == '__main__':
     HOST = parser.parse_args().host
     PORT = parser.parse_args().port
 
-    app.run( debug=True, host="127.0.0.1", port=PORT,  use_reloader=False )
+    app.run( debug=True, host=HOST, port=PORT,  use_reloader=False )
