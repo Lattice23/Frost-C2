@@ -1,13 +1,17 @@
-from multiprocessing import Process
+from multiprocessing import Process, Queue
 from flask_restful   import Resource, Api
+from contextlib      import redirect_stderr
 from colorama        import init, Fore, Back, Style
 from datetime        import datetime, timezone
 from flask           import Flask, request, jsonify, render_template_string
+from queue           import Empty
+from io              import StringIO
 
 
 import subprocess
 import threading
 import dbActions
+import flask.cli
 import argparse
 import requests
 import logging
@@ -177,6 +181,21 @@ class AddListener(Resource):
         """
         Create a listener process
         """
+
+        def run_listener(queue, app, **kwargs) -> None :
+            """Run listener and handle errors"""
+            with StringIO() as buf, redirect_stderr(buf):
+                try:
+
+                    app.run(**kwargs)
+
+                except Exception as error:
+                    queue.put("Failed",error)
+
+                finally:
+                    if "Permission denied" in buf.getvalue():
+                        queue.put("Permission denied")
+
         data    = request.get_json()
         host    = data["host"]
         port    = int( data["port"] )
@@ -187,9 +206,12 @@ class AddListener(Resource):
 
         # Create a new process for the listener
         if ( validIp.match( host ) ) and ( port > 0 ) and ( port < 65535 ):
+
             try:
+                queue = Queue()
                 proc = Process(
-                         target=app.run, 
+                         target=run_listener,
+                         args =(queue,app),
                          kwargs={
                          "debug": False, 
                          "host": host, 
@@ -197,13 +219,23 @@ class AddListener(Resource):
                          "use_reloader": False
                         })
                 proc.start()
-            except Exception as error:
-                print(f"\n{RED}Failed to start listener on {host}:{port}\n{error}\n{RESET}")
-                return jsonify(returned="failed to create listener")
 
-            listeners[ (host, port) ] = proc
-            print(f"\n{GREEN}Listener on http://{host}:{port} started{RESET}\n")
-            return jsonify(returned="success")
+            except Exception as error:
+                print(f"\n{RED}Failed to start listener on {host}:{port}: {error}\n{RESET}")
+                return jsonify(returned="Server failed to start listener")
+
+            finally:
+
+                try: # Check if the flask app returned permission denied
+                    error = queue.get( timeout=0.1 )
+                    if  ( error == "Permission denied" ) or ( "Failed" in error ) :
+                        print(f"\n{RED}Failed to start listener on {host}:{port}: {error}{RESET}")
+                        return jsonify(returned=f"Server failed to start listener: {error}")
+
+                except Empty: # return success if nothing was returned
+                       listeners[ (host, port) ] = proc
+                       print(f"\n{GREEN}Listener on http://{host}:{port} started{RESET}\n")
+                       return jsonify(returned="success")
         else:
             return jsonify(returned="bad ip or port")
 
@@ -276,6 +308,12 @@ api.add_resource(Tasks   ,   '/tasks')
 api.add_resource(Kill   ,   '/kill')
 api.add_resource(Ping  ,   '/ping')
 
+def no_banner(one, two):
+    """
+    Disable flask banner
+    """
+    pass
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser( description="Teamserver" )
@@ -285,4 +323,5 @@ if __name__ == '__main__':
     HOST = parser.parse_args().host
     PORT = parser.parse_args().port
 
-    app.run( debug=True, host=HOST, port=PORT,  use_reloader=False )
+    flask.cli.show_server_banner = no_banner
+    app.run( debug=False, host=HOST, port=PORT,  use_reloader=False )
