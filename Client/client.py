@@ -1,4 +1,3 @@
-from requests.exceptions import ConnectionError
 from frost               import FrostShell
 from time                import sleep
 
@@ -27,9 +26,8 @@ def StartClient() -> None :
                  success = True
                  break
             except Exception :
-                    sleep(1)
-        else:
-            pass
+                pass
+            sleep(1)
 
     if not success:
         frost.console.print(f"[bold red]Failed to connect teamserver!")
@@ -105,5 +103,7 @@ if ( __name__ == "__main__" ) :
 
     frost = FrostShell( SERVER, PORT )
 
-    StartClient()
-
+    try:
+        StartClient()
+    except KeyboardInterrupt as error:
+        frost.do_exit( 1 )

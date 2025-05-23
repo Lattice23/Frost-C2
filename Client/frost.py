@@ -1,4 +1,3 @@
-from requests.exceptions import ConnectionError
 from rich.console        import Console as csle
 from rich.table          import Table
 from contextlib          import redirect_stderr
@@ -200,6 +199,7 @@ class FrostShell( cmd.Cmd ):
 
         # Check if id int agents dict
         match ( id in self.agents.keys(), id in self.agents.values() ):
+
             case ( True, False ) :
                 del self.agents[id]
                 confirm( id )
@@ -255,17 +255,17 @@ class FrostShell( cmd.Cmd ):
 
             case ( False, True ):
 
-                   uuid = [x for x in self.agents.keys() if self.agents[x] == oldName]
+                   uuid = [x for x in self.agents.keys() if self.agents[x] == oldName][0]
                    try:
                        # change prompt if selected is in use
-                       if uuid[0] == self.current_agent:
-                           self.current_agent = uuid[0]
+                       if uuid == self.current_agent:
+                           self.current_agent = uuid
                            self.prompt        = BLUE + f"(Frost:{CYAN}{ name }{BLUE})> "  + RESET
 
-                       self.agents.update( {uuid[0] : name })
+                       self.agents.update( { uuid : name })
 
                        self.console.print(f"[bold cyan]\nAgent renamed...\n")
-                       requests.post( f"{self.BASEURL}/beacons/update", json={"AgentId":f"{ uuid[0] }","Name":f"{ name }"} )
+                       requests.post( f"{self.BASEURL}/beacons/update", json={"AgentId":f"{ uuid }","Name":f"{ name }"} )
                    except IndexError:
                        self.console.print(f"[bold red]\nAgent name or id not valid!\n")
 
@@ -388,10 +388,11 @@ class FrostShell( cmd.Cmd ):
 
              case ( False, True ) :
                     response = requests.post( f"{self.BASEURL}/listener/add", json={"host":server ,"port":port } ).json()
-                    if response["returned"] != "success":
-                         self.console.print(f"[bold red]\n{response['returned']}\n")
-                    else:
-                       self.console.print(f"[bold cyan]\nSuccessfully created listener on http://{server}:{port}\n")
+                    if response:
+                        if response["returned"] != "success" :
+                             self.console.print(f"[bold red]\n{response['returned']}\n")
+                        else:
+                           self.console.print(f"[bold cyan]\nSuccessfully created listener on http://{server}:{port}\n")
 
              case _ :
                   self.console.print("[bold red]\n [ -r --remove ] or [ -a --add ] is needed!\n")
@@ -457,17 +458,20 @@ class FrostShell( cmd.Cmd ):
         self.console.print(f"[bold blue]\nBye ☃️\n")
         self.postloop()
         os._exit( 1 )
-
-    def emptyline( self ) -> None :
+    
+    @staticmethod
+    def emptyline() -> None :
         pass
 
-    def parse( self, arg:str ) -> list[str] :
+    @staticmethod
+    def parse( arg:str ) -> list[str] :
         """
         Split Arguments into a list
         """
         return shlex.split( arg )
 
-    def argparseFail( self, parser:str, arglist:argparse.ArgumentParser ) -> tuple[argparse.Namespace, str]:
+    @staticmethod
+    def argparseFail( parser:str, arglist:argparse.ArgumentParser ) -> tuple[argparse.Namespace, str]:
          """
          Catch argparse stderr
          """
@@ -477,8 +481,9 @@ class FrostShell( cmd.Cmd ):
                  return args, None
              except SystemExit:
                  return None, buf.getvalue()
-
-    def preloop( self ) -> None :
+    
+    @staticmethod
+    def preloop() -> None :
         """
         Read history file
         """
@@ -489,7 +494,8 @@ class FrostShell( cmd.Cmd ):
                 open( HISTFILE, "a" ).close()
         return
 
-    def postloop( self ) -> None :
+    @staticmethod
+    def postloop() -> None :
         """
         Write history file
         """
